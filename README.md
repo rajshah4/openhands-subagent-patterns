@@ -21,22 +21,15 @@ SDK delegation, external async orchestration, and GitHub as a control plane.
    UI this appears as three separate conversation threads: app builder,
    connector builder, and integration tester.
 3. `sdk_subagents`
-   Uses a hardwired Python orchestration layer, but still runs each worker as a
-   first-class `V1` Cloud conversation. This is the SDK-oriented path for
-   explicit workflow graphs and subagent-style coordination in code.
+   Uses the OpenHands SDK sub-agent orchestration approach. A top-level
+   orchestrator hardwires the workflow graph in code, then launches worker
+   tasks as first-class `V1` Cloud conversations with explicit dependency and
+   handoff control.
 Across the patterns, the shared story is:
 
 - `app_builder` produces an app scaffold plus a clear blocked/unblocked split
 - `connector_builder` produces a connector plan plus integration handoff
 - `integration_tester` or follow-up workflow reconciles the two
-
-## Capability Matrix
-
-| Pattern | Uses SDK `Conversation` | Uses Cloud sandbox | UI-visible Cloud conversation | Durable history lives in |
-|---|---|---|---|---|
-| `github_control` | Not as the main control plane | Optional, via GitHub-triggered OpenHands runs | depends on how the GitHub integration is configured | GitHub issues, PRs, comments |
-| `oh_conversations` | Not as the primary control object | Yes | Yes | Cloud `V1` app conversations |
-| `sdk_subagents` | Yes, as the orchestration layer | Yes | Yes | Cloud `V1` app conversations plus local orchestration code |
 ## Setup
 
 ```bash
