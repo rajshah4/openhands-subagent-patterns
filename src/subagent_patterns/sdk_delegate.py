@@ -80,15 +80,20 @@ def run_sdk_delegate_demo(
             command="delegate",
             tasks={
                 "app_builder": (
-                    "Create app_scaffold.md and connector_contract.md in the workspace. "
+                    "Create app_scaffold.md, connector_contract.md, and blocked_work.md in the workspace. "
                     f"Base them on this request: {request.user_description}. "
                     f"State that the missing connector is {request.missing_connector}. "
+                    "Make the app scaffold explicit about which areas can continue immediately: "
+                    f"{', '.join(request.connector_independent_scope)}. "
+                    "List which work is blocked on the connector: "
+                    f"{', '.join(request.connector_dependent_scope)}. "
                     "Keep the files concise and specific."
                 ),
                 "connector_builder": (
-                    "Create connector_plan.md in the workspace. "
+                    "Create connector_plan.md and connector_handoff.md in the workspace. "
                     f"Design a missing {request.missing_connector} connector for this request: "
-                    f"{request.user_description}. Include auth, core operations, and test notes."
+                    f"{request.user_description}. Include auth, core operations, test notes, "
+                    "and a crisp handoff section that tells the app team how to wire it in."
                 ),
             },
         ),
@@ -109,9 +114,10 @@ def run_sdk_delegate_demo(
             command="delegate",
             tasks={
                 "integration_tester": (
-                    "Read app_scaffold.md, connector_contract.md, and connector_plan.md from the "
-                    "workspace. Create integration_summary.md that explains how the connector "
-                    "would be integrated and lists any remaining blockers."
+                    "Read app_scaffold.md, connector_contract.md, blocked_work.md, "
+                    "connector_plan.md, and connector_handoff.md from the workspace. "
+                    "Create integration_summary.md that explains how the connector would be "
+                    "integrated, what blocked work can now move forward, and any remaining blockers."
                 )
             },
         ),
@@ -121,7 +127,9 @@ def run_sdk_delegate_demo(
     artifact_paths = {
         "app_scaffold": workspace_dir / "app_scaffold.md",
         "connector_contract": workspace_dir / "connector_contract.md",
+        "blocked_work": workspace_dir / "blocked_work.md",
         "connector_plan": workspace_dir / "connector_plan.md",
+        "connector_handoff": workspace_dir / "connector_handoff.md",
         "integration_summary": workspace_dir / "integration_summary.md",
     }
     artifacts = {name: _read_if_exists(path) for name, path in artifact_paths.items()}

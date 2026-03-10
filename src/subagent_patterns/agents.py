@@ -15,14 +15,15 @@ from subagent_patterns.skills import load_skill
 
 
 def build_llm(usage_id: str) -> LLM:
-    api_key = os.getenv("LLM_API_KEY")
-    base_url = os.getenv("LLM_BASE_URL")
+    api_key = os.getenv("LLM_API_KEY") or os.getenv("OH_API_KEY")
     model = os.getenv("LLM_MODEL", "openhands/claude-sonnet-4-5-20250929")
+    if not model.startswith("openhands/"):
+        model = "openhands/claude-sonnet-4-5-20250929"
     return LLM(
         usage_id=usage_id,
         model=model,
         api_key=SecretStr(api_key) if api_key else None,
-        base_url=base_url or None,
+        base_url=None,
     )
 
 

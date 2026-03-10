@@ -27,10 +27,12 @@ EXPECTED_ARTIFACTS = {
         f"{REMOTE_PROJECT_DIR}/app_scaffold.md",
         f"{REMOTE_PROJECT_DIR}/connector_contract.md",
         f"{REMOTE_PROJECT_DIR}/app_progress.md",
+        f"{REMOTE_PROJECT_DIR}/blocked_work.md",
     ],
     "connector_builder": [
         f"{REMOTE_PROJECT_DIR}/connector_plan.md",
         f"{REMOTE_PROJECT_DIR}/connector_progress.md",
+        f"{REMOTE_PROJECT_DIR}/connector_handoff.md",
     ],
     "integration_tester": [
         f"{REMOTE_PROJECT_DIR}/integration_summary.md",
@@ -95,6 +97,7 @@ Create only these files and then stop:
 - /workspace/project/app_scaffold.md
 - /workspace/project/connector_contract.md
 - /workspace/project/app_progress.md
+- /workspace/project/blocked_work.md
 
 Do not create source code, folders, or extra files.
 
@@ -107,9 +110,10 @@ A required connector may be missing: {request.missing_connector}.
 Requirements:
 1. `app_scaffold.md`: concise module map and app phases
 2. `connector_contract.md`: exact connector methods and payload expectations
-3. `app_progress.md`: list what can proceed now vs what is blocked on the connector
+3. `app_progress.md`: list what can proceed now using this scope: {", ".join(request.connector_independent_scope)}
+4. `blocked_work.md`: list what is still blocked on the connector using this scope: {", ".join(request.connector_dependent_scope)}
 
-When those three files are written, finish immediately.
+When those four files are written, finish immediately.
 """.strip()
 
 
@@ -118,6 +122,7 @@ def build_connector_prompt(request: BuildRequest) -> str:
 Create only these files and then stop:
 - /workspace/project/connector_plan.md
 - /workspace/project/connector_progress.md
+- /workspace/project/connector_handoff.md
 
 Do not create source code, folders, or extra files.
 
@@ -128,9 +133,10 @@ Build a missing {request.missing_connector} connector for this application reque
 Requirements:
 1. `connector_plan.md`: concise connector design, auth, operations, and tests
 2. `connector_progress.md`: what is done, assumptions, and open questions
+3. `connector_handoff.md`: exact integration notes for the app team, including what blocked work can now resume
 
 Include an integration contract section inside `connector_plan.md`.
-When both files are written, finish immediately.
+When all three files are written, finish immediately.
 """.strip()
 
 
@@ -144,12 +150,15 @@ Read the following files if they exist:
 - /workspace/project/connector_contract.md
 - /workspace/project/connector_plan.md
 - /workspace/project/app_progress.md
+- /workspace/project/blocked_work.md
 - /workspace/project/connector_progress.md
+- /workspace/project/connector_handoff.md
 
 In `integration_summary.md`, validate:
 1. contract compatibility
 2. expected integration points
-3. remaining blockers before end-to-end testing
+3. which previously blocked work can now move forward
+4. remaining blockers before end-to-end testing
 
 Do not create code or extra files. Finish immediately after writing the summary.
 """.strip()

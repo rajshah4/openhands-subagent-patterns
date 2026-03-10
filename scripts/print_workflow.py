@@ -16,7 +16,11 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Print the workflow mental model.")
     parser.add_argument(
         "--option",
-        choices=["sdk_delegate", "cloud_async", "github_control"],
+        choices=[
+            "github_control",
+            "oh_conversations",
+            "sdk_subagents",
+        ],
         required=True,
     )
     return parser.parse_args()

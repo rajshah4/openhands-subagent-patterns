@@ -25,7 +25,12 @@ def load_project_env() -> Path | None:
     if fallback_env.exists():
         # Only inherit secrets and cloud config from the older tutorial repo.
         # Do not inherit LiteLLM proxy settings or model aliases.
-        for key in ("OPENHANDS_CLOUD_API_KEY", "LLM_API_KEY", "LMNR_PROJECT_API_KEY"):
+        for key in (
+            "OH_API_KEY",
+            "OPENHANDS_CLOUD_API_KEY",
+            "LLM_API_KEY",
+            "LMNR_PROJECT_API_KEY",
+        ):
             if not os.getenv(key):
                 value = dotenv_values(fallback_env).get(key)
                 if value:
@@ -37,6 +42,12 @@ def load_project_env() -> Path | None:
     os.environ.pop("LLM_BASE_URL", None)
     if not os.getenv("LLM_MODEL", "").startswith("openhands/"):
         os.environ["LLM_MODEL"] = "openhands/claude-sonnet-4-5-20250929"
+    if not os.getenv("LLM_API_KEY") and os.getenv("OH_API_KEY"):
+        os.environ["LLM_API_KEY"] = os.environ["OH_API_KEY"]
+    if not os.getenv("LITELLM_PROXY_API_KEY"):
+        fallback_proxy_key = os.getenv("LLM_API_KEY") or os.getenv("OH_API_KEY")
+        if fallback_proxy_key:
+            os.environ["LITELLM_PROXY_API_KEY"] = fallback_proxy_key
 
     return loaded
 

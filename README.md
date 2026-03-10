@@ -8,50 +8,35 @@ The examples are intended as customer-facing patterns, not production
 starters. The main value is the orchestration shape and the tradeoffs between
 SDK delegation, external async orchestration, and GitHub as a control plane.
 
-## The three demos
+## The patterns
 
 1. `github_control`
    Uses issues, PRs, and `@OpenHands` comments as the coordination surface. The
-   repo becomes the durable workflow state.
-2. `cloud_async`
-   Uses OpenHands Cloud conversations as separate long-running workers. An
-   external orchestrator starts both flows, polls them independently, and
-   injects connector results back into the app flow.
-3. `sdk_delegate`
-   Uses the OpenHands SDK delegate pattern. The parent orchestrator blocks while
-   sub-agents run, so the main flow is modeled as plan -> delegate in parallel ->
-   integrate.
+   repo becomes the durable workflow state. The issue captures blocked work and
+   the PR carries the connector handoff back to the app flow.
+2. `oh_conversations`
+   Uses `V1` Cloud conversations as the control surface. Each worker is its own
+   first-class Cloud conversation, and a final integration conversation consumes
+   the outputs from the app-builder and connector-builder conversations. In the
+   UI this appears as three separate conversation threads: app builder,
+   connector builder, and integration tester.
+3. `sdk_subagents`
+   Uses a hardwired Python orchestration layer, but still runs each worker as a
+   first-class `V1` Cloud conversation. This is the SDK-oriented path for
+   explicit workflow graphs and subagent-style coordination in code.
+Across the patterns, the shared story is:
+
+- `app_builder` produces an app scaffold plus a clear blocked/unblocked split
+- `connector_builder` produces a connector plan plus integration handoff
+- `integration_tester` or follow-up workflow reconciles the two
 
 ## Capability Matrix
 
 | Pattern | Uses SDK `Conversation` | Uses Cloud sandbox | UI-visible Cloud conversation | Durable history lives in |
 |---|---|---|---|---|
 | `github_control` | Not as the main control plane | Optional, via GitHub-triggered OpenHands runs | depends on how the GitHub integration is configured | GitHub issues, PRs, comments |
-| `cloud_async` | Yes, remote | Yes | No, not in this implementation | remote agent-server event history plus local downloaded artifacts |
-| `sdk_delegate` | Yes, local | No | No | local run artifacts |
-
-## Important Distinction: Cloud Sandbox vs Cloud UI Conversation
-
-OpenHands Cloud has two layers that are easy to conflate:
-
-- Cloud sandbox / agent-server runtime:
-  this is what `OpenHandsCloudWorkspace` provisions. The SDK then talks
-  directly to the remote agent server running inside that sandbox.
-- Cloud UI conversation:
-  this is the hosted product conversation you usually browse at
-  `https://app.all-hands.dev/conversations/<id>`.
-
-In this repo's `cloud_async` demo, the script creates real OpenHands Cloud
-sandboxes and real remote SDK conversations, but those conversations are not
-automatically registered as Cloud UI conversations. The event history exists on
-the remote agent-server and is also downloaded into `results/`.
-
-Practical consequence:
-
-- `cloud_async` is real cloud execution
-- the conversation IDs are real remote conversation IDs
-- those IDs should not be expected to appear in the normal Cloud UI history
-
+| `oh_conversations` | Not as the primary control object | Yes | Yes | Cloud `V1` app conversations |
+| `sdk_subagents` | Yes, as the orchestration layer | Yes | Yes | Cloud `V1` app conversations plus local orchestration code |
 ## Setup
 
 ```bash
@@ -63,36 +48,54 @@ cp .env.example .env
 ## Dry-run mental model
 
 ```bash
-uv run python scripts/print_workflow.py --option sdk_delegate
-uv run python scripts/print_workflow.py --option cloud_async
 uv run python scripts/print_workflow.py --option github_control
+uv run python scripts/print_workflow.py --option oh_conversations
+uv run python scripts/print_workflow.py --option sdk_subagents
 ```
 
 ## Demo entrypoints
 
 ```bash
-uv run python scripts/demo_sdk_delegate.py --dry-run
-uv run python scripts/demo_async_cloud.py --dry-run
 uv run python scripts/demo_github_control.py --dry-run
+uv run python scripts/demo_oh_conversations.py --dry-run
+uv run python scripts/demo_sdk_subagents.py --dry-run
 ```
 
-The async cloud path now also supports a first live orchestration skeleton:
+The conversation-control path now supports a live `V1` flow:
 
 ```bash
-uv run python scripts/demo_async_cloud.py --run-live --keep-alive
+uv run python scripts/demo_oh_conversations.py --run-live
 ```
 
-That flow starts separate cloud sandboxes and remote SDK conversations for the
-app builder and connector builder, runs them with `blocking=False`, polls for
-artifact readiness independently, uploads the completed artifacts into a final
-integration sandbox, and saves a JSON summary under `results/cloud_async/`.
+That flow starts separate `V1` app conversations for the app builder and
+connector builder, waits for both to finish, extracts their final outputs from
+the event stream, starts a third integration conversation, and saves a JSON
+summary under `results/oh_conversations/`.
+
+The hybrid SDK + conversations path is available here:
+
+```bash
+uv run python scripts/demo_sdk_subagents.py --run-live
+```
+
+That flow hardwires the workflow graph in Python, launches the worker steps as
+`V1` Cloud conversations, and saves a JSON summary under
+`results/sdk_subagents/`.
+
+Representative artifacts now include:
+
+- `app_scaffold.md`
+- `connector_contract.md`
+- `blocked_work.md`
+- `connector_plan.md`
+- `connector_handoff.md`
+- `integration_summary.md`
 
 Current live behavior:
 
 - `github_control`: validated against live GitHub issue/PR/comment flow
-- `cloud_async`: validated against real OpenHands Cloud sandboxes
-- `sdk_delegate`: validated locally
-
+- `oh_conversations`: live `V1` conversation creation and completion are working
+- `sdk_subagents`: live `V1` orchestration works when MCP is healthy
 Current cloud caveat:
 
 - sandbox cleanup currently returns `405 Method Not Allowed` from the Cloud API
@@ -104,6 +107,5 @@ Current cloud caveat:
 For a first POC:
 
 - start with `github_control` if you want the simplest operational control plane
-- start with `cloud_async` if true overlapping long-running work is required
-- use `sdk_delegate` only when the work can be cleanly decomposed up front and
-  the parent agent does not need to keep reasoning during child execution
+- start with `oh_conversations` if you want Cloud-native conversation history as the control surface
+- move to `sdk_subagents` when you want the same Cloud conversation surface but a more explicit workflow graph in code

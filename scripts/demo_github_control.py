@@ -29,12 +29,12 @@ def main() -> int:
     args = parse_args()
     print(preview("github_control"))
     print("")
-    print("Stub repo events:")
-    print("1. Main workflow opens issue: missing salesforce connector")
-    print("2. @OpenHands comment triggers connector builder skill set")
-    print("3. Connector branch becomes a PR")
+    print("Workflow shape:")
+    print("1. App workflow opens an issue for the missing connector and blocked work")
+    print("2. @OpenHands comment triggers the connector builder branch")
+    print("3. Connector branch becomes a PR with a handoff artifact")
     print("4. Merge or @OpenHands on PR triggers integration")
-    print("5. Final validation comments summarize release readiness")
+    print("5. Final validation comments summarize what unblocked app work can ship")
 
     if args.dry_run or not args.run_live:
         return 0
