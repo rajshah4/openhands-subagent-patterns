@@ -10,25 +10,25 @@ SDK delegation, external async orchestration, and GitHub as a control plane.
 
 ## The three demos
 
-1. `sdk_delegate`
-   Uses the OpenHands SDK delegate pattern. The parent orchestrator blocks while
-   sub-agents run, so the main flow is modeled as plan -> delegate in parallel ->
-   integrate.
+1. `github_control`
+   Uses issues, PRs, and `@OpenHands` comments as the coordination surface. The
+   repo becomes the durable workflow state.
 2. `cloud_async`
    Uses OpenHands Cloud conversations as separate long-running workers. An
    external orchestrator starts both flows, polls them independently, and
    injects connector results back into the app flow.
-3. `github_control`
-   Uses issues, PRs, and `@OpenHands` comments as the coordination surface. The
-   repo becomes the durable workflow state.
+3. `sdk_delegate`
+   Uses the OpenHands SDK delegate pattern. The parent orchestrator blocks while
+   sub-agents run, so the main flow is modeled as plan -> delegate in parallel ->
+   integrate.
 
 ## Capability Matrix
 
 | Pattern | Uses SDK `Conversation` | Uses Cloud sandbox | UI-visible Cloud conversation | Durable history lives in |
 |---|---|---|---|---|
-| `sdk_delegate` | Yes, local | No | No | local run artifacts |
-| `cloud_async` | Yes, remote | Yes | No, not in this implementation | remote agent-server event history plus local downloaded artifacts |
 | `github_control` | Not as the main control plane | Optional, via GitHub-triggered OpenHands runs | depends on how the GitHub integration is configured | GitHub issues, PRs, comments |
+| `cloud_async` | Yes, remote | Yes | No, not in this implementation | remote agent-server event history plus local downloaded artifacts |
+| `sdk_delegate` | Yes, local | No | No | local run artifacts |
 
 ## Important Distinction: Cloud Sandbox vs Cloud UI Conversation
 
@@ -89,9 +89,9 @@ integration sandbox, and saves a JSON summary under `results/cloud_async/`.
 
 Current live behavior:
 
-- `sdk_delegate`: validated locally
-- `cloud_async`: validated against real OpenHands Cloud sandboxes
 - `github_control`: validated against live GitHub issue/PR/comment flow
+- `cloud_async`: validated against real OpenHands Cloud sandboxes
+- `sdk_delegate`: validated locally
 
 Current cloud caveat:
 
