@@ -47,7 +47,7 @@ def build_stub_run_sequence() -> list[str]:
         "Create remote connector conversation",
         "Send scoped task to each conversation",
         "Run both conversations with blocking=False",
-        "Poll execution_status until both are terminal",
+        "Poll every few seconds for status and required artifacts",
         "Send connector completion update into app flow",
         "Start final integration or validation conversation",
     ]
@@ -74,23 +74,36 @@ def main() -> int:
         ]
         statuses = wait_for_workers(
             workers,
+            output_dir=Path(args.output_dir),
             poll_interval=args.poll_interval,
             timeout=args.timeout,
         )
         print("")
         print("Worker statuses:")
-        for name, status in statuses.items():
-            print(f"- {name}: {status}")
+        for name, completion in statuses.items():
+            print(f"- {name}: status={completion.status}, artifacts_ready={completion.artifacts_ready}")
+
+        integration_inputs: list[str] = []
+        for completion in statuses.values():
+            integration_inputs.extend(completion.downloaded_artifacts)
 
         time.sleep(1)
-        integration_worker = run_integration(request, keep_alive=args.keep_alive)
+        integration_worker = run_integration(
+            request,
+            integration_inputs,
+            keep_alive=args.keep_alive,
+        )
         integration_statuses = wait_for_workers(
             [integration_worker],
+            output_dir=Path(args.output_dir),
             poll_interval=args.poll_interval,
             timeout=args.timeout,
         )
         integration_status = integration_statuses["integration_tester"]
-        print(f"- integration_tester: {integration_status}")
+        print(
+            "- integration_tester: "
+            f"status={integration_status.status}, artifacts_ready={integration_status.artifacts_ready}"
+        )
 
         summary_path = save_run_summary(
             output_dir=Path(args.output_dir),

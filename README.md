@@ -1,14 +1,12 @@
 # OpenHands Subagent Patterns
 
-This folder is a stubbed POC workspace for three ways to structure a
+This repo shows three ways to structure a
 "user description -> generated app -> missing connector built in parallel"
 workflow with OpenHands.
 
-It is intentionally lightweight tonight:
-
-- the code is scaffolded but not wired to production credentials
-- the demos focus on orchestration shape, not full execution
-- the skills are placeholders you can swap with real project skills later
+The examples are intended as customer-facing patterns, not production
+starters. The main value is the orchestration shape and the tradeoffs between
+SDK delegation, external async orchestration, and GitHub as a control plane.
 
 ## The three demos
 
@@ -23,6 +21,36 @@ It is intentionally lightweight tonight:
 3. `github_control`
    Uses issues, PRs, and `@OpenHands` comments as the coordination surface. The
    repo becomes the durable workflow state.
+
+## Capability Matrix
+
+| Pattern | Uses SDK `Conversation` | Uses Cloud sandbox | UI-visible Cloud conversation | Durable history lives in |
+|---|---|---|---|---|
+| `sdk_delegate` | Yes, local | No | No | local run artifacts |
+| `cloud_async` | Yes, remote | Yes | No, not in this implementation | remote agent-server event history plus local downloaded artifacts |
+| `github_control` | Not as the main control plane | Optional, via GitHub-triggered OpenHands runs | depends on how the GitHub integration is configured | GitHub issues, PRs, comments |
+
+## Important Distinction: Cloud Sandbox vs Cloud UI Conversation
+
+OpenHands Cloud has two layers that are easy to conflate:
+
+- Cloud sandbox / agent-server runtime:
+  this is what `OpenHandsCloudWorkspace` provisions. The SDK then talks
+  directly to the remote agent server running inside that sandbox.
+- Cloud UI conversation:
+  this is the hosted product conversation you usually browse at
+  `https://app.all-hands.dev/conversations/<id>`.
+
+In this repo's `cloud_async` demo, the script creates real OpenHands Cloud
+sandboxes and real remote SDK conversations, but those conversations are not
+automatically registered as Cloud UI conversations. The event history exists on
+the remote agent-server and is also downloaded into `results/`.
+
+Practical consequence:
+
+- `cloud_async` is real cloud execution
+- the conversation IDs are real remote conversation IDs
+- those IDs should not be expected to appear in the normal Cloud UI history
 
 ## Setup
 
@@ -54,10 +82,22 @@ The async cloud path now also supports a first live orchestration skeleton:
 uv run python scripts/demo_async_cloud.py --run-live --keep-alive
 ```
 
-That flow starts separate cloud conversations for the app builder and connector
-builder, runs them with `blocking=False`, polls status independently, then
-starts a final integration conversation and saves a JSON summary under
-`results/cloud_async/`.
+That flow starts separate cloud sandboxes and remote SDK conversations for the
+app builder and connector builder, runs them with `blocking=False`, polls for
+artifact readiness independently, uploads the completed artifacts into a final
+integration sandbox, and saves a JSON summary under `results/cloud_async/`.
+
+Current live behavior:
+
+- `sdk_delegate`: validated locally
+- `cloud_async`: validated against real OpenHands Cloud sandboxes
+- `github_control`: validated against live GitHub issue/PR/comment flow
+
+Current cloud caveat:
+
+- sandbox cleanup currently returns `405 Method Not Allowed` from the Cloud API
+  during teardown, so the orchestration logic works but cleanup is not fully
+  clean yet
 
 ## Recommendation
 

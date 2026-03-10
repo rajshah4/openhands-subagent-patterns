@@ -43,6 +43,14 @@ Key property:
 - the concurrency lives outside the agent's single reasoning loop
 - the orchestrator owns state, retries, and artifact routing
 
+Important distinction:
+
+- this pattern uses real OpenHands Cloud sandboxes and remote SDK conversations
+- those remote conversation IDs are not necessarily the same thing as the
+  Cloud UI conversations visible at `app.all-hands.dev/conversations/...`
+- in this repo, history is durable at the remote agent-server layer and in the
+  downloaded local artifacts under `results/`
+
 ## 3. GitHub Control Surface
 
 Use this when you want durable state, review checkpoints, and minimal custom

@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from openhands.sdk import Conversation, Event
 from openhands.workspace import OpenHandsCloudWorkspace
@@ -18,6 +20,22 @@ from subagent_patterns.models import BuildRequest
 
 
 DEFAULT_CLOUD_URL = "https://app.all-hands.dev"
+REMOTE_PROJECT_DIR = "/workspace/project"
+
+EXPECTED_ARTIFACTS = {
+    "app_builder": [
+        f"{REMOTE_PROJECT_DIR}/app_scaffold.md",
+        f"{REMOTE_PROJECT_DIR}/connector_contract.md",
+        f"{REMOTE_PROJECT_DIR}/app_progress.md",
+    ],
+    "connector_builder": [
+        f"{REMOTE_PROJECT_DIR}/connector_plan.md",
+        f"{REMOTE_PROJECT_DIR}/connector_progress.md",
+    ],
+    "integration_tester": [
+        f"{REMOTE_PROJECT_DIR}/integration_summary.md",
+    ],
+}
 
 
 @dataclass
@@ -26,6 +44,14 @@ class WorkerHandle:
     workspace: OpenHandsCloudWorkspace
     conversation: Conversation
     events: list[dict]
+
+
+@dataclass
+class WorkerCompletion:
+    status: str
+    artifacts_ready: bool
+    artifacts: list[str]
+    downloaded_artifacts: list[str]
 
 
 def get_sandbox_id(workspace: OpenHandsCloudWorkspace) -> str | None:
@@ -157,14 +183,57 @@ def start_worker(name: str, request: BuildRequest, *, keep_alive: bool = True) -
     )
 
 
+def worker_artifacts_ready(worker: WorkerHandle) -> tuple[bool, list[str]]:
+    expected = EXPECTED_ARTIFACTS[worker.name]
+    present: list[str] = []
+    for remote_path in expected:
+        result = worker.workspace.execute_command(
+            f"test -f {shlex.quote(remote_path)}",
+            timeout=10.0,
+        )
+        if result.exit_code == 0:
+            present.append(remote_path)
+    return len(present) == len(expected), present
+
+
+def download_worker_artifacts(
+    worker: WorkerHandle,
+    remote_paths: list[str],
+    *,
+    base_dir: Path,
+) -> list[str]:
+    downloaded: list[str] = []
+    worker_dir = base_dir / worker.name
+    worker_dir.mkdir(parents=True, exist_ok=True)
+    for remote_path in remote_paths:
+        local_path = worker_dir / Path(remote_path).name
+        worker.workspace.file_download(remote_path, local_path)
+        downloaded.append(str(local_path))
+    return downloaded
+
+
+def upload_seed_artifacts(
+    workspace: OpenHandsCloudWorkspace,
+    artifact_paths: list[str],
+) -> list[str]:
+    uploaded: list[str] = []
+    for local_path in artifact_paths:
+        destination_path = f"{REMOTE_PROJECT_DIR}/{Path(local_path).name}"
+        workspace.file_upload(local_path, destination_path)
+        uploaded.append(destination_path)
+    return uploaded
+
+
 def wait_for_workers(
     workers: list[WorkerHandle],
     *,
+    output_dir: Path,
     poll_interval: float = 5.0,
     timeout: float = 1800.0,
-) -> dict[str, str]:
+) -> dict[str, WorkerCompletion]:
     started = time.monotonic()
-    final_statuses: dict[str, str] = {}
+    final_statuses: dict[str, WorkerCompletion] = {}
+    artifacts_dir = output_dir / "artifacts"
 
     while len(final_statuses) < len(workers):
         if time.monotonic() - started > timeout:
@@ -174,8 +243,31 @@ def wait_for_workers(
             if worker.name in final_statuses:
                 continue
             status = worker.conversation.state.execution_status.value
-            if status != "running":
-                final_statuses[worker.name] = status
+            artifacts_ready, present = worker_artifacts_ready(worker)
+            if present:
+                print(
+                    f"[poll] {worker.name}: status={status}, "
+                    f"artifacts={len(present)}/{len(EXPECTED_ARTIFACTS[worker.name])}"
+                )
+            if artifacts_ready:
+                downloaded = download_worker_artifacts(
+                    worker,
+                    present,
+                    base_dir=artifacts_dir,
+                )
+                final_statuses[worker.name] = WorkerCompletion(
+                    status=status,
+                    artifacts_ready=True,
+                    artifacts=present,
+                    downloaded_artifacts=downloaded,
+                )
+            elif status in {"error", "stuck"}:
+                final_statuses[worker.name] = WorkerCompletion(
+                    status=status,
+                    artifacts_ready=False,
+                    artifacts=present,
+                    downloaded_artifacts=[],
+                )
         if len(final_statuses) < len(workers):
             time.sleep(poll_interval)
 
@@ -184,11 +276,15 @@ def wait_for_workers(
 
 def run_integration(
     request: BuildRequest,
+    source_artifacts: list[str],
     *,
     keep_alive: bool = True,
 ) -> WorkerHandle:
     events: list[dict] = []
     workspace = create_cloud_workspace(keep_alive=keep_alive)
+    uploaded = upload_seed_artifacts(workspace, source_artifacts)
+    if uploaded:
+        events.append({"type": "SeedArtifactsUploaded", "artifacts": uploaded})
     conversation = Conversation(
         agent=build_integration_tester_agent(),
         workspace=workspace,
@@ -208,19 +304,22 @@ def save_run_summary(
     *,
     output_dir: Path,
     request: BuildRequest,
-    worker_statuses: dict[str, str],
-    integration_status: str | None,
+    worker_statuses: dict[str, WorkerCompletion],
+    integration_status: WorkerCompletion | None,
     workers: list[WorkerHandle],
     integration_worker: WorkerHandle | None,
 ) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
-    payload = {
+    payload: dict[str, Any] = {
         "request": request.model_dump(),
         "workers": {
             worker.name: {
                 "conversation_id": str(worker.conversation.id),
                 "sandbox_id": get_sandbox_id(worker.workspace),
-                "status": worker_statuses.get(worker.name),
+                "status": worker_statuses[worker.name].status,
+                "artifacts_ready": worker_statuses[worker.name].artifacts_ready,
+                "artifacts": worker_statuses[worker.name].artifacts,
+                "downloaded_artifacts": worker_statuses[worker.name].downloaded_artifacts,
                 "event_count": len(worker.events),
             }
             for worker in workers
@@ -229,7 +328,10 @@ def save_run_summary(
             {
                 "conversation_id": str(integration_worker.conversation.id),
                 "sandbox_id": get_sandbox_id(integration_worker.workspace),
-                "status": integration_status,
+                "status": integration_status.status,
+                "artifacts_ready": integration_status.artifacts_ready,
+                "artifacts": integration_status.artifacts,
+                "downloaded_artifacts": integration_status.downloaded_artifacts,
                 "event_count": len(integration_worker.events),
             }
             if integration_worker
