@@ -65,47 +65,67 @@ def create_cloud_workspace(*, keep_alive: bool = True) -> OpenHandsCloudWorkspac
 
 def build_app_prompt(request: BuildRequest) -> str:
     return f"""
-You are building an application from this user request:
+Create only these files and then stop:
+- /workspace/project/app_scaffold.md
+- /workspace/project/connector_contract.md
+- /workspace/project/app_progress.md
+
+Do not create source code, folders, or extra files.
+
+User request:
 
 {request.user_description}
 
 A required connector may be missing: {request.missing_connector}.
 
-Proceed with work that does not depend on the missing connector. Produce:
-1. an application skeleton
-2. a connector contract with required methods and payloads
-3. a list of dependency gates that must wait for the connector
+Requirements:
+1. `app_scaffold.md`: concise module map and app phases
+2. `connector_contract.md`: exact connector methods and payload expectations
+3. `app_progress.md`: list what can proceed now vs what is blocked on the connector
 
-Write progress notes into /workspace/project/app_progress.md.
+When those three files are written, finish immediately.
 """.strip()
 
 
 def build_connector_prompt(request: BuildRequest) -> str:
     return f"""
+Create only these files and then stop:
+- /workspace/project/connector_plan.md
+- /workspace/project/connector_progress.md
+
+Do not create source code, folders, or extra files.
+
 Build a missing {request.missing_connector} connector for this application request:
 
 {request.user_description}
 
-Produce:
-1. a connector design summary
-2. a proposed implementation plan
-3. an integration contract the app builder can consume
+Requirements:
+1. `connector_plan.md`: concise connector design, auth, operations, and tests
+2. `connector_progress.md`: what is done, assumptions, and open questions
 
-Write progress notes into /workspace/project/connector_progress.md.
+Include an integration contract section inside `connector_plan.md`.
+When both files are written, finish immediately.
 """.strip()
 
 
 def build_integration_prompt(request: BuildRequest) -> str:
     return f"""
-Integrate the app builder output with the completed {request.missing_connector}
-connector work.
+Create only this file and then stop:
+- /workspace/project/integration_summary.md
 
-Validate:
+Read the following files if they exist:
+- /workspace/project/app_scaffold.md
+- /workspace/project/connector_contract.md
+- /workspace/project/connector_plan.md
+- /workspace/project/app_progress.md
+- /workspace/project/connector_progress.md
+
+In `integration_summary.md`, validate:
 1. contract compatibility
 2. expected integration points
 3. remaining blockers before end-to-end testing
 
-Write your summary into /workspace/project/integration_summary.md.
+Do not create code or extra files. Finish immediately after writing the summary.
 """.strip()
 
 

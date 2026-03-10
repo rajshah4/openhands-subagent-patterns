@@ -6,6 +6,10 @@ from pydantic import SecretStr
 
 from openhands.sdk import Agent, AgentContext, LLM, Tool
 from openhands.sdk.subagent.registry import register_agent_if_absent
+from openhands.tools.delegate import DelegateTool
+from openhands.tools.file_editor import FileEditorTool
+from openhands.tools.task_tracker import TaskTrackerTool
+from openhands.tools.terminal import TerminalTool
 
 from subagent_patterns.skills import load_skill
 
@@ -25,7 +29,7 @@ def build_llm(usage_id: str) -> LLM:
 def build_agent(
     *,
     usage_id: str,
-    tools: list[str],
+    tools: list[Tool],
     skill_names: list[str],
     system_message_suffix: str,
 ) -> Agent:
@@ -35,7 +39,7 @@ def build_agent(
     )
     return Agent(
         llm=build_llm(usage_id),
-        tools=[Tool(name=name) for name in tools],
+        tools=tools,
         agent_context=context,
     )
 
@@ -43,7 +47,10 @@ def build_agent(
 def build_orchestrator_agent() -> Agent:
     return build_agent(
         usage_id="subagent-patterns-orchestrator",
-        tools=["DelegateTool", "TaskTrackerTool"],
+        tools=[
+            Tool(name=DelegateTool.name),
+            Tool(name=TaskTrackerTool.name),
+        ],
         skill_names=["app_builder"],
         system_message_suffix=(
             "You are the top-level orchestrator. Split work into "
@@ -55,7 +62,14 @@ def build_orchestrator_agent() -> Agent:
 def build_app_builder_agent() -> Agent:
     return build_agent(
         usage_id="subagent-patterns-app-builder",
-        tools=["TerminalTool", "FileEditorTool", "TaskTrackerTool"],
+        tools=[
+            Tool(
+                name=TerminalTool.name,
+                params={"terminal_type": "subprocess", "shell_path": "/bin/bash"},
+            ),
+            Tool(name=FileEditorTool.name),
+            Tool(name=TaskTrackerTool.name),
+        ],
         skill_names=["app_builder"],
         system_message_suffix="Focus on application scaffolding and integration boundaries.",
     )
@@ -64,7 +78,14 @@ def build_app_builder_agent() -> Agent:
 def build_connector_builder_agent() -> Agent:
     return build_agent(
         usage_id="subagent-patterns-connector-builder",
-        tools=["TerminalTool", "FileEditorTool", "TaskTrackerTool"],
+        tools=[
+            Tool(
+                name=TerminalTool.name,
+                params={"terminal_type": "subprocess", "shell_path": "/bin/bash"},
+            ),
+            Tool(name=FileEditorTool.name),
+            Tool(name=TaskTrackerTool.name),
+        ],
         skill_names=["connector_builder"],
         system_message_suffix="Build missing connectors with clean contracts and tests.",
     )
@@ -73,7 +94,14 @@ def build_connector_builder_agent() -> Agent:
 def build_integration_tester_agent() -> Agent:
     return build_agent(
         usage_id="subagent-patterns-integration-tester",
-        tools=["TerminalTool", "FileEditorTool", "TaskTrackerTool"],
+        tools=[
+            Tool(
+                name=TerminalTool.name,
+                params={"terminal_type": "subprocess", "shell_path": "/bin/bash"},
+            ),
+            Tool(name=FileEditorTool.name),
+            Tool(name=TaskTrackerTool.name),
+        ],
         skill_names=["integration_tester"],
         system_message_suffix="Integrate completed artifacts and validate end-to-end behavior.",
     )

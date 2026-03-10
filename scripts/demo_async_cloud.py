@@ -5,14 +5,10 @@ import sys
 import time
 from pathlib import Path
 
-from dotenv import load_dotenv
-
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
-
-load_dotenv(ROOT / ".env")
 
 from subagent_patterns.demo_runner import preview
 from subagent_patterns.cloud_async import (
@@ -22,7 +18,11 @@ from subagent_patterns.cloud_async import (
     start_worker,
     wait_for_workers,
 )
+from subagent_patterns.env import load_project_env
 from subagent_patterns.models import BuildRequest
+
+
+load_project_env()
 
 
 def parse_args() -> argparse.Namespace:
