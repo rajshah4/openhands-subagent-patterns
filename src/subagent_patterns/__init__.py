@@ -1,0 +1,1 @@
+"""OpenHands subagent pattern stubs."""
