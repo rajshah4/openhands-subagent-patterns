@@ -40,7 +40,7 @@ uv run python scripts/print_workflow.py --option cloud_async
 uv run python scripts/print_workflow.py --option github_control
 ```
 
-## Stub demo entrypoints
+## Demo entrypoints
 
 ```bash
 uv run python scripts/demo_sdk_delegate.py --dry-run
@@ -48,8 +48,16 @@ uv run python scripts/demo_async_cloud.py --dry-run
 uv run python scripts/demo_github_control.py --dry-run
 ```
 
-Tomorrow, the same scripts can be extended to execute real workspaces and real
-conversations.
+The async cloud path now also supports a first live orchestration skeleton:
+
+```bash
+uv run python scripts/demo_async_cloud.py --run-live --keep-alive
+```
+
+That flow starts separate cloud conversations for the app builder and connector
+builder, runs them with `blocking=False`, polls status independently, then
+starts a final integration conversation and saves a JSON summary under
+`results/cloud_async/`.
 
 ## Recommendation
 
