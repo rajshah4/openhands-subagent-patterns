@@ -5,3 +5,4 @@ __pycache__/
 *.pyc
 src/*.egg-info/
 results/
+docs/cloud_layers_explainer.md

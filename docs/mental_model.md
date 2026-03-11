@@ -1,82 +1,81 @@
 # Mental Model
 
-## 1. SDK Delegate
+This repo currently centers on three active patterns:
 
-Use this when the parent can stop while children work.
+1. `github_control`
+2. `oh_conversations`
+3. `sdk_subagents`
 
-Flow:
+They all tell the same customer story:
 
-1. Orchestrator agent reads the product request.
-2. It identifies connector-dependent and connector-independent work.
-3. It spawns:
-   - `connector_builder`
-   - `app_builder`
-4. It delegates both tasks in one blocking call.
-5. When both complete, the orchestrator resumes.
-6. It hands artifacts to `integration_tester`.
-7. It integrates, tests, and finishes.
+- `app_builder` produces an app scaffold plus blocked and unblocked work
+- `connector_builder` produces the connector plan and integration handoff
+- `integration_tester` or a follow-up integration step reconciles the two
 
-Key property:
+## 1. GitHub Control
 
-- concurrency exists among child workers
-- the parent conversation is blocked until all delegated work returns
-
-## 2. Cloud Async
-
-Use this when two conversations truly need to run independently.
+Use this when you want the repository to be the workflow state.
 
 Flow:
 
-1. External Python orchestrator receives the request.
-2. It creates separate cloud conversations for:
-   - `connector_builder`
-   - `app_builder`
-3. It sends each a scoped task.
-4. It calls `run(blocking=False)` on each remote conversation.
-5. It polls status or watches callbacks independently.
-6. If the connector finishes first, it writes the connector artifact somewhere
-   durable and sends an update message to the app conversation.
-7. When both converge, it starts an integration conversation or final run.
+1. `app_builder` opens a missing-connector issue with scoped requirements.
+2. `connector_builder` responds in the repo and opens a PR.
+3. A reviewer or bot signals readiness with a merge or `@OpenHands` comment.
+4. `integration_tester` pulls the PR state into final validation.
 
 Key property:
 
-- the concurrency lives outside the agent's single reasoning loop
-- the orchestrator owns state, retries, and artifact routing
+- issues, PRs, comments, and repo state carry the workflow context
+- orchestration is durable and review-friendly, but higher latency is normal
 
-Important distinction:
+## 2. OH Conversations
 
-- this pattern uses real OpenHands Cloud sandboxes and remote SDK conversations
-- those remote conversation IDs are not necessarily the same thing as the
-  Cloud UI conversations visible at `app.all-hands.dev/conversations/...`
-- in this repo, history is durable at the remote agent-server layer and in the
-  downloaded local artifacts under `results/`
-
-## 3. GitHub Control Surface
-
-Use this when you want durable state, review checkpoints, and minimal custom
-infrastructure.
+Use this when you want Cloud-native conversation history to be the control
+surface.
 
 Flow:
 
-1. Main workflow opens a repo issue for a missing connector.
-2. `@OpenHands` on the issue triggers the connector skill set.
-3. Connector work lands in a PR.
-4. The main app flow continues on independent work or pauses at a dependency
-   gate.
-5. A PR comment or merge event triggers integration and testing.
-6. The repo timeline becomes the audit log.
+1. A conversation orchestrator creates one `V1` conversation for app planning.
+2. It creates a second `V1` conversation for connector building.
+3. The app conversation returns scaffold output, contract expectations, and
+   blocked work.
+4. The connector conversation returns the connector plan and integration
+   handoff.
+5. The orchestrator starts a third integration conversation that reconciles the
+   two outputs into a final plan.
 
 Key property:
 
-- orchestration is event-driven and durable
-- latency is higher, but human intervention is natural
+- each worker is a first-class Cloud conversation with independent history
+- the orchestrator owns polling, sequencing, and output routing between
+  conversations
 
-## POC Guidance
+## 3. SDK Subagents
 
-For a team evaluating these patterns:
+Use this when you want the workflow graph to live in code while still using
+`V1` Cloud conversations for the worker runs.
 
-- `sdk_delegate` is the cleanest demo of "sub-agents" but not the cleanest demo
-  of "main agent keeps working"
-- `cloud_async` matches that requirement most directly
-- `github_control` is the easiest path to a business-friendly demo with visible
-  checkpoints
+Flow:
+
+1. An SDK orchestrator defines worker roles, dependencies, and handoff rules in
+   Python.
+2. It launches the app-builder step as a `V1` Cloud conversation.
+3. It launches the connector-builder step as a `V1` Cloud conversation.
+4. After those steps complete, it launches the integration step as the next
+   stage in the graph.
+
+Key property:
+
+- workflow structure is explicit and repeatable in code
+- workers still run as first-class Cloud conversations rather than hidden local
+  subtasks
+
+## Recommendation
+
+For a first POC:
+
+- start with `github_control` for the simplest operational control plane
+- start with `oh_conversations` if conversation history should be the visible
+  control surface
+- move to `sdk_subagents` when you want stronger code-level control over
+  dependencies and handoffs
