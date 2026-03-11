@@ -25,6 +25,7 @@ SDK delegation, external async orchestration, and GitHub as a control plane.
    orchestrator hardwires the workflow graph in code, then launches worker
    tasks as first-class `V1` Cloud conversations with explicit dependency and
    handoff control.
+   
 Across the patterns, the shared story is:
 
 - `app_builder` produces an app scaffold plus a clear blocked/unblocked split
